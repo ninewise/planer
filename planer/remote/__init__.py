@@ -1,0 +1,4 @@
+
+def main():
+    print("PLANER REMOTE EXPECTING TO HEAR YOUR WISHES")
+
