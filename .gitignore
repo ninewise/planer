@@ -2,3 +2,5 @@ build/
 planer.egg-info/
 __pycache__
 client_secret.json
+.venv
+activate
