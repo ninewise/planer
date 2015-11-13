@@ -8,7 +8,7 @@ from pprint import pprint
 # Configuring the config filename
 _appname = (__package__ or 'planer.daemon').split('.')[0]
 _config_file = _appname + '.conf'
-_defaults_file = os.path.join(__path__[0], _config_file)
+_defaults_file = os.path.join(os.path.dirname(__file__), _config_file)
 
 
 # Read default and user configurations
