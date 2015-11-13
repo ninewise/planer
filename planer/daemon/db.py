@@ -2,7 +2,9 @@
 from datetime import datetime
 from pony.orm import Database, PrimaryKey, Required, Set, Optional, sql_debug
 
-db = Database("sqlite", "database.sqlite", create_db=True)
+from planer.config import config
+
+db = Database("sqlite", config['daemon']['database file'], create_db=True)
 
 class Calendar(db.Entity):
     id = PrimaryKey(int, auto=True)
