@@ -21,12 +21,6 @@ def get_calendar(calendar):
     return to_json(db.Calendar[calendar])
 
 
-@app.route('/events', methods=["GET"])
-@db_session
-def events():
-    return to_json(db.Event.select())
-
-
 @app.route('/events/<int:event>', methods=["GET"])
 @db_session
 def get_event(event):

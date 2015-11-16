@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 
 from pony.orm import db_session
 
+from planer.config import config
+
 from planer.daemon.api import app
 from planer.daemon.db import db
 
@@ -15,5 +17,7 @@ with db_session:
 
 def main():
     app.debug = True
-    app.run(host='0.0.0.0', threaded=True, port=8000)
+    app.run(host=config['daemon']['host'],
+            threaded=True,
+            port=int(config['daemon']['port']))
 
