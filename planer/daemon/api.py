@@ -2,9 +2,9 @@
 import flask
 
 from pony.orm import db_session
-from pony.orm.serialization import to_json
 
 from planer.daemon.db import db
+from planer.daemon.json_converter import to_json
 
 app = flask.Flask("Planer Http API")
 
