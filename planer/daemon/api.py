@@ -1,12 +1,14 @@
 
-import flask
-
+from flask import Flask
+from werkzeug.exceptions import HTTPException, default_exceptions
 from pony.orm import db_session
 
 from planer.daemon.db import db
 from planer.daemon.json_converter import as_json
 
-app = flask.Flask("Planer Http API")
+__all__ = ["app"]
+
+app = Flask("Planer Http API")
 
 
 @app.route('/calendars', methods=["GET"])
@@ -31,4 +33,14 @@ def get_event(event):
 def new_event():
     pass
 
+
+# Handling error's (source: http://flask.pocoo.org/snippets/83/)
+def make_json_error(ex):
+    response = as_json(
+            { "message": str(ex) },
+            status=ex.code if isinstance(ex, HTTPException) else 500)
+    return response
+
+for code in default_exceptions:
+    app.errorhandler(code)(make_json_error)
 
