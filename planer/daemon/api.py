@@ -1,10 +1,12 @@
 
-from flask import Flask
+from flask import Flask, request
 from werkzeug.exceptions import HTTPException, default_exceptions
-from pony.orm import db_session
+from pony.orm import db_session, select
+from simpledate import SimpleDate
 
 from planer.daemon.db import db
 from planer.daemon.json_converter import as_json
+from planer.config import config
 
 __all__ = ["app"]
 
@@ -23,6 +25,14 @@ def get_calendar(calendar):
     return as_json(db.Calendar[calendar])
 
 
+@app.route('/calendars/<int:calendar>/events', methods=["GET"])
+@db_session
+def get_calendar_events(calendar):
+    return as_json(select(e.id for e in db.Event if e.calendar ==
+        db.Calendar[calendar]))
+    #return as_json([e.id for e in db.Calendar[calendar].events])
+
+
 @app.route('/events/<int:event>', methods=["GET"])
 @db_session
 def get_event(event):
@@ -30,7 +40,25 @@ def get_event(event):
 
 
 @app.route('/events/new', methods=["POST"])
+@db_session
 def new_event():
+    event = dict(calendar=db.Calendar[request.form['calendar']],
+                 summary=request.form['summary'],
+                 description=request.form.get('description', None),
+                 location=request.form.get('location', ''))
+    timezone = request.form.get('timezone', config['remote']['timezone'])
+    event['start_time'] = SimpleDate(
+            request.form['start_time'],
+            tz=timezone).datetime
+    event['end_time'] = SimpleDate(
+            request.form['end_time'],
+            tz=timezone).datetime
+    db.Event(**event)
+    return as_json(dict(message="OK"))
+
+
+@app.route('/events/interval', methods=["GET"])
+def event_interval():
     pass
 
 

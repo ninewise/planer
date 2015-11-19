@@ -16,7 +16,7 @@ def _resolve(obj):
     if isinstance(obj, Entity):
         return obj.to_dict()
     elif isinstance(obj, Query):
-        return [x.to_dict() for x in obj]
+        return [_resolve(x) for x in obj]
     else:
         return obj
 
