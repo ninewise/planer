@@ -30,7 +30,6 @@ def get_calendar(calendar):
 def get_calendar_events(calendar):
     return as_json(select(e.id for e in db.Event if e.calendar ==
         db.Calendar[calendar]))
-    #return as_json([e.id for e in db.Calendar[calendar].events])
 
 
 @app.route('/events/<int:event>', methods=["GET"])
