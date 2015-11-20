@@ -1,11 +1,10 @@
 
+import asyncio
 from datetime import datetime, timedelta
 
 from pony.orm import db_session
 
-from planer.config import config
-
-from planer.daemon.api import app
+from planer.daemon.api import run_api_server
 from planer.daemon.db import db
 
 with db_session:
@@ -16,8 +15,9 @@ with db_session:
     db.Event(summary="Test Event 2", start_time=datetime.now(), end_time=datetime.now() + timedelta(hours=1), calendar=c)
 
 def main():
-    app.debug = True
-    app.run(host=config['daemon']['host'],
-            threaded=True,
-            port=int(config['daemon']['port']))
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(asyncio.wait([
+        run_api_server()]))
+    loop.close()
+
 

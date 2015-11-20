@@ -12,24 +12,22 @@ from planer.config import config
 __all__ = ["run_api_server"]
 
 
+@asyncio.coroutine
 def run_api_server():
-    loop = asyncio.get_event_loop()
     server_closing = asyncio.Future()
     coro = asyncio.start_server(ConnectionHandler(server_closing),
                                 config['daemon']['host'],
-                                config['daemon']['port'],
-                                loop=loop)
-    server = loop.run_until_complete(coro)
+                                config['daemon']['port'])
+    server = yield from coro
 
     # Serve requests until Ctrl+C is pressed
     print('Serving on {}'.format(server.sockets[0].getsockname()))
-    message = loop.run_until_complete(server_closing)
+    message = yield from server_closing
     print(message)
 
     # Close the server
     server.close()
-    loop.run_until_complete(server.wait_closed())
-    loop.close()
+    yield from server.wait_closed()
 
 
 class HandlerException(RuntimeError):

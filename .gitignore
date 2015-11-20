@@ -1,6 +1,9 @@
-build/
-planer.egg-info/
+
+# ignore venv and pip
+bin
+include
+lib
+pip-selfcheck.json
+
+# ignore caches
 __pycache__
-client_secret.json
-.venv
-activate
