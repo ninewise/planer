@@ -41,7 +41,7 @@ class ConnectionHandler(object):
     def __init__(self, close_server):
         self.close_server = close_server
         self.handlers = self.__class__.HANDLERS
-        self.handlers['close'] = self.close
+        self.handlers['exit'] = self.exit
 
     @asyncio.coroutine
     def __call__(self, reader, writer):
@@ -50,11 +50,6 @@ class ConnectionHandler(object):
         message = json.loads(data.decode())
         addr = writer.get_extra_info('peername')
         print("Received {} from {}".format(repr(message), addr))
-
-        if message == "close":
-            self.close_server.set_result("Closing the server on request")
-            writer.close()
-            return
 
         try:
             if "action" not in message:
@@ -74,7 +69,7 @@ class ConnectionHandler(object):
         print("Close the client socket")
         writer.close()
 
-    def close(self, message):
+    def exit(self, message):
         self.close_server.set_result("Closing server on request.")
 
     @classmethod
