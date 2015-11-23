@@ -63,7 +63,8 @@ class ConnectionHandler(object):
             answer["success"] = True
         except HandlerException as e:
             answer = dict(error=str(e), success=False)
-        writer.write(json.dumps(answer, default=json_converter).encode())
+        json_answer = json.dumps(answer, default=json_converter)
+        writer.write("{}\n".format(json_answer).encode())
         yield from writer.drain()
 
         print("Close the client socket")
@@ -133,11 +134,11 @@ def show_event(message):
 def new_event(message):
     try:
         with db_session:
-            calendar = get_entity(message.get("calendar", None), db.Calendar)
+            calendar = get_entity(message.get("id", None), db.Calendar)
             event = dict(calendar=calendar,
                          summary=message["summary"],
-                         description=message.get("description", None),
-                         location=message.get("location", ""))
+                         description=message.get("description", None) or "",
+                         location=message.get("location", None) or "")
             timezone = message.get('timezone', config['remote']['timezone'])
             event["start_time"] = SimpleDate(message["start_time"], tz=timezone).datetime
             event["end_time"] = SimpleDate(message["end_time"], tz=timezone).datetime
