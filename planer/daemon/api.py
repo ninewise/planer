@@ -81,6 +81,17 @@ class ConnectionHandler(object):
         return handler_adder
 
 
+@db_session
+def get_entity(id, table, word):
+    if not id:
+        raise HandlerException("Please provide {}".format(word))
+    with db_session: entity = table.get(id=id)
+    if not entity:
+        raise HandlerException(
+                "{} with that id not found.".format(table._table_))
+    return entity
+
+
 @ConnectionHandler.add_handler_for("echo")
 def echo(message):
     message["action"] = "echo"
@@ -92,49 +103,38 @@ def help(_):
     return dict(commands=list(ConnectionHandler.HANDLERS.keys()))
 
 
-@ConnectionHandler.add_handler_for("list calendars")
-@db_session
-def list_calendars(_):
-    return dict(ids=list(select(c.id for c in db.Calendar)))
+@ConnectionHandler.add_handler_for("list")
+def list_(message):
+    if "calendar" in message:
+        calendar = get_entity(message.get("calendar", None), db.Calendar)
+        with db_session:
+            events = list(select(e.id for e in db.Event if e.calendar == calendar))
+        reply = dict(ids=events)
+    else:
+        with db_session:
+            calendars = list(select(c.id for c in db.Calendar))
+        reply = dict(ids=calendars)
+    return reply
 
 
-@db_session
-def get_entity(id, table):
-    if not id: raise HandlerException("Please provide an id.")
-    with db_session: entity = table.get(id=id)
-    if not entity:
-        raise HandlerException(
-                "{} with that id not found.".format(table._table_))
-    return entity
-
-
-@ConnectionHandler.add_handler_for("show calendar")
-def show_calendar(message):
-    calendar = get_entity(message.get("id", None), db.Calendar)
-    return calendar.to_dict()
-
-
-@ConnectionHandler.add_handler_for("list calendar events")
-def list_calendar_events(message):
-    calendar = get_entity(message.get("id", None), db.Calendar)
-    with db_session:
-        events = list(select(e.id for e in db.Event if e.calendar == calendar))
-    return dict(ids=events)
-
-
-@ConnectionHandler.add_handler_for("show event")
+@ConnectionHandler.add_handler_for("show")
 @db_session # TODO remove this when somehow to_dict no longer
             # retrieves the calendar
-def show_event(message):
-    event = get_entity(message.get("id", None), db.Event)
-    return event.to_dict()
+def show(message):
+    if "event" in message: key, cls, word = "event", db.Event, "an event"
+    elif "calendar" in message: key, cls = "calendar", db.Calendar, "a calendar"
+    else: raise HandlerException("Provide an event or calendar id to show.")
+    entity = get_entity(message.get(key, None), cls, word)
+    return entity.to_dict()
 
 
-@ConnectionHandler.add_handler_for("new event")
-def new_event(message):
+@ConnectionHandler.add_handler_for("create-event")
+def create_event(message):
     try:
         with db_session:
-            calendar = get_entity(message.get("id", None), db.Calendar)
+            calendar = get_entity(message.get("calendar", None),
+                                  db.Calendar,
+                                  "a calendar")
             event = dict(calendar=calendar,
                          summary=message["summary"],
                          description=message.get("description", None) or "",
@@ -144,6 +144,8 @@ def new_event(message):
             event["end_time"] = SimpleDate(message["end_time"], tz=timezone).datetime
             e = db.Event(**event)
         return dict(id=e.id)
+    except KeyError as exc:
+        raise HandlerException("An event requires key: {}.".format(exc))
     except Exception as exc:
         raise HandlerException(exc)
 
