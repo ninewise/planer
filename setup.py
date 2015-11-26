@@ -41,7 +41,7 @@ setup(
         'Natural Language :: English',
         # 'Operating System :: POSIX', I'll try, but I can't promise yet.
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.4', # That's what it's tested on.
+        'Programming Language :: Python :: 3.5', # That's what it's tested on.
         'Topic :: Office/Business :: Scheduling',
     ],
     keywords='planer planner calendar',
