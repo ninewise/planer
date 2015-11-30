@@ -3,6 +3,7 @@ import asyncio
 import json
 import datetime
 import re
+import traceback
 
 from pony.orm import db_session, select
 from pony.orm.serialization import json_converter
@@ -64,6 +65,7 @@ class ConnectionHandler(object):
             answer = handler(message) or {}
             answer["success"] = True
         except HandlerException as e:
+            traceback.print_exc()
             answer = dict(error=str(e), success=False)
         json_answer = json.dumps(answer, default=json_converter)
         writer.write("{}\n".format(json_answer).encode())
@@ -132,34 +134,16 @@ def show(message):
     return entity.to_dict()
 
 
-REGEXES = dict(
-        single_floater=re.compile("[A-Z0-9]*(?P<floater>[,.])?[0-9]+[A-Z]"),
-        letters=re.compile(
-            "P"
-            + "(?:(?P<years>\d+(?:[.,]\d+)?)Y)?"
-            + "(?:(?P<months>\d+(?:[.,]\d+)?)M)?"
-            + "(?:(?P<days>\d+(?:[.,]\d+)?)D)?"
-            + "(T"
-            + "(?:(?P<hours>\d+(?:[.,]\d+)?)H)?"
-            + "(?:(?P<minutes>\d+(?:[.,]\d+)?)M)?"
-            + "(?:(?P<seconds>\d+(?:[.,]\d+)?)S)?"
-            + ")?"))
+DURATION_REGEX = re.compile("(?P<hours>\d*):(?P<minutes>\d*):(?P<seconds>\d*)")
 def parse_duration(duration):
-    match = REGEXES['single_floater'].fullmatch(duration)
-    if not match:
-        raise HandlerException("duration may contain only one comma "
-                               + "or full stop, and that in the most "
-                               + "precise unit provided.")
-    floater = match.groupdict().get('floater')
-
-    if not duration.startswith("P"):
-        raise HandlerException("duration should start with 'P'")
-    groups = REGEXES['letters'].fullmatch(duration).groupdict()
-    # TODO return timedelta
-    if "years" in groups or "months" in groups:
-        raise HandlerException("duration does not take years and months")
-    return floater, groups
-
+    match = DURATION_REGEX.fullmatch(duration)
+    if match is None:
+        raise HandlerException("incorrect duration format")
+    groups = match.groupdict()
+    return datetime.timedelta(
+            hours=int(groups.get("hours") or "0"),
+            minutes=int(groups.get("minutes") or "0"),
+            seconds=int(groups.get("seconds") or "0"))
 
 
 @ConnectionHandler.add_handler_for("create-event")
@@ -171,20 +155,15 @@ def create_event(message):
         calendar = get_entity(message.get("calendar", None),
                               db.Calendar,
                               "a calendar")
-        event = dict(calendar=calendar,
+        event = dict(calendar=calendar.id,
                      summary=message["summary"],
                      description=message.get("description", None) or "",
                      location=message.get("location", None) or "")
         timezone = message.get('timezone', config['remote']['timezone'])
         event["start_time"] = SimpleDate(message["start_time"], tz=timezone).datetime
         if "duration" in message:
-            event["end_time"] = event["start_time"] + datetime.timedelta(
-                    message["duration"].get("years"),
-                    message["duration"].get("months"),
-                    message["duration"].get("days"),
-                    message["duration"].get("hours"),
-                    message["duration"].get("minutes"),
-                    message["duration"].get("seconds"))
+            event["end_time"] = event["start_time"]
+            event["end_time"] += parse_duration(message["duration"])
         else:
             event["end_time"] = SimpleDate(message["end_time"], tz=timezone).datetime
         with db_session:
