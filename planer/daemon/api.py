@@ -1,6 +1,8 @@
 
 import asyncio
 import json
+import datetime
+import re
 
 from pony.orm import db_session, select
 from pony.orm.serialization import json_converter
@@ -106,7 +108,9 @@ def help(_):
 @ConnectionHandler.add_handler_for("list")
 def list_(message):
     if "calendar" in message:
-        calendar = get_entity(message.get("calendar", None), db.Calendar)
+        calendar = get_entity(message.get("calendar", None),
+                              db.Calendar,
+                              "a calendar")
         with db_session:
             events = list(select(e.id for e in db.Event if e.calendar == calendar))
         reply = dict(ids=events)
@@ -128,20 +132,62 @@ def show(message):
     return entity.to_dict()
 
 
+REGEXES = dict(
+        single_floater=re.compile("[A-Z0-9]*(?P<floater>[,.])?[0-9]+[A-Z]"),
+        letters=re.compile(
+            "P"
+            + "(?:(?P<years>\d+(?:[.,]\d+)?)Y)?"
+            + "(?:(?P<months>\d+(?:[.,]\d+)?)M)?"
+            + "(?:(?P<days>\d+(?:[.,]\d+)?)D)?"
+            + "(T"
+            + "(?:(?P<hours>\d+(?:[.,]\d+)?)H)?"
+            + "(?:(?P<minutes>\d+(?:[.,]\d+)?)M)?"
+            + "(?:(?P<seconds>\d+(?:[.,]\d+)?)S)?"
+            + ")?"))
+def parse_duration(duration):
+    match = REGEXES['single_floater'].fullmatch(duration)
+    if not match:
+        raise HandlerException("duration may contain only one comma "
+                               + "or full stop, and that in the most "
+                               + "precise unit provided.")
+    floater = match.groupdict().get('floater')
+
+    if not duration.startswith("P"):
+        raise HandlerException("duration should start with 'P'")
+    groups = REGEXES['letters'].fullmatch(duration).groupdict()
+    # TODO return timedelta
+    if "years" in groups or "months" in groups:
+        raise HandlerException("duration does not take years and months")
+    return floater, groups
+
+
+
 @ConnectionHandler.add_handler_for("create-event")
 def create_event(message):
+    if ("end_time" in message) + ("duration" in message) != 1:
+        raise HandlerException("Creating an event requires either a "
+                + "end_time or a duration, not neither nor both.")
     try:
-        with db_session:
-            calendar = get_entity(message.get("calendar", None),
-                                  db.Calendar,
-                                  "a calendar")
-            event = dict(calendar=calendar,
-                         summary=message["summary"],
-                         description=message.get("description", None) or "",
-                         location=message.get("location", None) or "")
-            timezone = message.get('timezone', config['remote']['timezone'])
-            event["start_time"] = SimpleDate(message["start_time"], tz=timezone).datetime
+        calendar = get_entity(message.get("calendar", None),
+                              db.Calendar,
+                              "a calendar")
+        event = dict(calendar=calendar,
+                     summary=message["summary"],
+                     description=message.get("description", None) or "",
+                     location=message.get("location", None) or "")
+        timezone = message.get('timezone', config['remote']['timezone'])
+        event["start_time"] = SimpleDate(message["start_time"], tz=timezone).datetime
+        if "duration" in message:
+            event["end_time"] = event["start_time"] + datetime.timedelta(
+                    message["duration"].get("years"),
+                    message["duration"].get("months"),
+                    message["duration"].get("days"),
+                    message["duration"].get("hours"),
+                    message["duration"].get("minutes"),
+                    message["duration"].get("seconds"))
+        else:
             event["end_time"] = SimpleDate(message["end_time"], tz=timezone).datetime
+        with db_session:
             e = db.Event(**event)
         return dict(id=e.id)
     except KeyError as exc:
